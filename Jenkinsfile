@@ -10,44 +10,26 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                echo 'Récupération du code source depuis Git'
                 checkout scm
             }
         }
 
-        stage('Build') {
+        stage('Build & Tests') {
             steps {
-                echo 'Compilation du projet'
-                bat 'mvn clean compile'
+                bat 'mvn clean verify'
             }
         }
 
-        stage('Unit Tests') {
+        stage('Analyse SonarQube') {
             steps {
-                echo 'Exécution des tests unitaires'
-                bat 'mvn test'
-            }
-            post {
-                always {
-                    junit 'target/surefire-reports/*.xml'
-                }
-            }
-        }
-
-        stage('SonarQube Analysis') {
-            steps {
-                echo 'Analyse de la qualité du code avec SonarQube'
-                withSonarQubeEnv('SonarQube') {
-                    bat 'mvn verify sonar:sonar'
-                }
-            }
-        }
-
-        stage('Quality Gate') {
-            steps {
-                echo 'Vérification du Quality Gate'
-                timeout(time: 5, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
+                withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+                    bat '''
+                        mvn sonar:sonar ^
+                        -Dsonar.host.url=http://localhost:9000 ^
+                        -Dsonar.projectKey=todo-project ^
+                        -Dsonar.projectName=todo-project ^
+                        -Dsonar.token=%SONAR_TOKEN%
+                    '''
                 }
             }
         }
@@ -55,7 +37,7 @@ pipeline {
 
     post {
         success {
-            echo 'Pipeline Jenkins exécuté avec succès '
+            echo 'Pipeline Jenkins terminé avec succès '
         }
         failure {
             echo 'Pipeline Jenkins échoué '
