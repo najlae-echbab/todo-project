@@ -2,47 +2,63 @@ pipeline {
     agent any
 
     tools {
-        maven 'Maven'
-    }
-
-    environment {
-        SONAR_PROJECT_KEY = 'Todo_Project'
+        jdk 'JDK17'
+        maven 'Maven3'
     }
 
     stages {
 
         stage('Checkout') {
             steps {
+                echo 'Récupération du code source depuis Git'
                 checkout scm
             }
         }
 
-        stage('Build & Tests') {
+        stage('Build') {
             steps {
-                sh 'mvn clean test'
+                echo 'Compilation du projet'
+                bat 'mvn clean compile'
+            }
+        }
+
+        stage('Unit Tests') {
+            steps {
+                echo 'Exécution des tests unitaires'
+                bat 'mvn test'
+            }
+            post {
+                always {
+                    junit 'target/surefire-reports/*.xml'
+                }
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
+                echo 'Analyse de la qualité du code avec SonarQube'
                 withSonarQubeEnv('SonarQube') {
-                    sh 'mvn verify sonar:sonar'
+                    bat 'mvn verify sonar:sonar'
                 }
             }
         }
 
         stage('Quality Gate') {
             steps {
-                timeout(time: 1, unit: 'MINUTES') {
+                echo 'Vérification du Quality Gate'
+                timeout(time: 5, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
                 }
             }
         }
+    }
 
-        stage('Build Docker Image') {
-            steps {
-                sh 'docker build -t todo-app .'
-            }
+    post {
+        success {
+            echo 'Pipeline Jenkins exécuté avec succès '
+        }
+        failure {
+            echo 'Pipeline Jenkins échoué '
         }
     }
 }
